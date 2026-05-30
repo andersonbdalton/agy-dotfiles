@@ -34,24 +34,49 @@ For complex objectives, the Coordinator spawns a specialized swarm partitioned a
 
 ## Migration Guide & Setup Instructions
 
-To mirror this configuration instantly on a second machine, run the following commands:
+To mirror this configuration instantly on a second machine, run the following commands based on your operating system:
 
+### 1. Common Initialization (All Operating Systems)
 ```bash
-# 1. Create the destination folder path
+# Create the destination folder path
 mkdir -p ~/.gemini/antigravity-cli/
 
-# 2. Clone the configuration files directly into the global space
+# Clone the configuration files directly into the global space
 git clone https://github.com/andersonbdalton/agy-dotfiles.git ~/.gemini/antigravity-cli/
+```
 
-# 3. Setup the pre-commit hook in the repository
+### 2. OS-Specific Ownership & Permission Settings
+
+Ensure your execution engine has complete ownership and read/write rights over configuration and project workspaces (`~/dev/`):
+
+#### Linux & macOS (Bash/Zsh)
+```bash
+# Setup the pre-commit hook in the repository
 ln -sf ~/.gemini/antigravity-cli/scripts/pre-commit ~/.gemini/antigravity-cli/.git/hooks/pre-commit
 chmod +x ~/.gemini/antigravity-cli/.git/hooks/pre-commit
 
-# 4. Ensure correct ownership and read/write permissions for the active user
-chown -R $(whoami) ~/.gemini/ ~/dev/ 2>/dev/null || true
-chmod -R u+rwx ~/.gemini/ ~/dev/ 2>/dev/null || true
+# Secure ownership and permissions recursively
+chown -R $(whoami) ~/.gemini/ ~/dev/
+chmod -R u+rwx ~/.gemini/ ~/dev/
 
-# 5. Verify directory contents
+# Verify directory contents
 ls -la ~/.gemini/antigravity-cli/
+```
+
+#### Windows (PowerShell - Run as Administrator)
+```powershell
+# Copy the pre-commit hook script manually
+Copy-Item -Path "$HOME\.gemini\antigravity-cli\scripts\pre-commit" -Destination "$HOME\.gemini\antigravity-cli\.git\hooks\pre-commit" -Force
+
+# Secure ownership of settings and development workspaces
+takeown /F "$HOME\.gemini" /R /A /D Y
+takeown /F "$HOME\dev" /R /A /D Y
+
+# Grant Full Control permissions to the current Windows user
+icacls "$HOME\.gemini" /grant "${env:USERNAME}:(OI)(CI)F" /T /C
+icacls "$HOME\dev" /grant "${env:USERNAME}:(OI)(CI)F" /T /C
+
+# Verify directory contents
+Get-ChildItem -Path "$HOME\.gemini\antigravity-cli"
 ```
 
