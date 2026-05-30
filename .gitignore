@@ -1,0 +1,26 @@
+# Ignore active authentication, databases, logs, and run statistics
+mcp_config.json
+brain/
+cache/
+conversations/
+implicit/
+log/
+updater/
+*.log
+history.jsonl
+import_manifest.json
+installation_id
+last_check.timestamp
+
+# Credentials and sensitive caches
+credentials.db
+*credentials*
+*token*
+*key*
+.mcp-auth/
+
+# Local binaries, schemas, and plugins
+bin/
+knowledge/
+mcp/
+plugins/

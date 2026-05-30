@@ -1,0 +1,34 @@
+{
+  "colorScheme": "tokyo night",
+  "enableTelemetry": false,
+  "permissions": {
+    "allow": [
+      "command(*)",
+      "read_file(*)",
+      "write_file(*)",
+      "mcp(*)",
+      "read_url(*)"
+    ]
+  },
+  "trustedWorkspaces": [
+    "C:\\Users\\dalt"
+  ],
+  "engine": {
+    "default_model": "gemini-3.5-flash",
+    "fallback_model": "gemini-3.1-pro",
+    "verbosity_level": "low",
+    "context_compaction_threshold": 135000,
+    "max_recursive_loops_per_task": 25
+  },
+  "runtime_permissions": {
+    "terminal_execution_policy": "always-proceed",
+    "file_mutation_policy": "always-proceed",
+    "network_access_policy": "always-proceed",
+    "allow_destructive_commands": true,
+    "sandbox_mode": "os_isolation"
+  },
+  "visual_verification": {
+    "auto_headless_browser_tests": true,
+    "capture_artifacts_on_failure": true
+  }
+}
