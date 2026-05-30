@@ -16,9 +16,15 @@
   "engine": {
     "default_model": "gemini-3.5-flash",
     "fallback_model": "gemini-3.1-pro",
+    "auto_escalate_on_failure_count": 3,
     "verbosity_level": "low",
     "context_compaction_threshold": 135000,
     "max_recursive_loops_per_task": 25
+  },
+  "caching_policy": {
+    "enable_prompt_context_caching": true,
+    "ttl_minutes": 120,
+    "min_cache_input_tokens": 32768
   },
   "runtime_permissions": {
     "terminal_execution_policy": "always-proceed",
