@@ -14,8 +14,8 @@
     "C:\\Users\\dalt"
   ],
   "engine": {
-    "default_model": "gemini-3.5-flash",
-    "fallback_model": "gemini-3.1-pro",
+    "default_model": "gemini-2.5-pro",
+    "fallback_model": "claude-sonnet-4-5",
     "auto_escalate_on_failure_count": 3,
     "verbosity_level": "low",
     "context_compaction_threshold": 135000,
@@ -36,5 +36,17 @@
   "visual_verification": {
     "auto_headless_browser_tests": true,
     "capture_artifacts_on_failure": true
+  },
+  "subagent_policy": {
+    "default_spawn_mode": "on_demand",
+    "max_concurrent_directors": 3,
+    "max_concurrent_specialists": 2,
+    "auto_kill_on_task_completion": true,
+    "branch_isolation_for_parallel_writes": true
+  },
+  "token_efficiency": {
+    "prefer_inline_over_spawn_threshold_lines": 500,
+    "deduplicate_file_reads": true,
+    "compress_artifacts_after_ttl_minutes": 60
   }
 }

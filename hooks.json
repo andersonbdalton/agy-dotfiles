@@ -2,7 +2,31 @@
   "hooks": [
     {
       "lifecycle_stage": "before_tool_call",
-      "condition": { "tool_name": "terminal_run" },
+      "condition": { "tool_name": "write_file" },
+      "action": "log",
+      "message": "[AGY] File mutation detected. Compile verification will run post-write."
+    },
+    {
+      "lifecycle_stage": "after_tool_call",
+      "condition": { "tool_name": "write_file", "file_extension": [".go"] },
+      "action": "execute_local_script",
+      "script_path": "~/.gemini/scripts/verify_go.sh"
+    },
+    {
+      "lifecycle_stage": "after_tool_call",
+      "condition": { "tool_name": "write_file", "file_extension": [".rs"] },
+      "action": "execute_local_script",
+      "script_path": "~/.gemini/scripts/verify_rust.sh"
+    },
+    {
+      "lifecycle_stage": "after_tool_call",
+      "condition": { "tool_name": "write_file", "file_extension": [".ts", ".tsx"] },
+      "action": "execute_local_script",
+      "script_path": "~/.gemini/scripts/verify_ts.sh"
+    },
+    {
+      "lifecycle_stage": "before_tool_call",
+      "condition": { "tool_name": "run_command" },
       "action": "execute_local_script",
       "script_path": "~/.gemini/scripts/global_linter_check.sh"
     }

@@ -1,16 +1,60 @@
 #!/bin/bash
-echo "??? Running Pre-Commit Governance Shield..."
+# pre-commit — AGY Governance Shield
+# Runs all validation gates before allowing a commit through.
+# Install: cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
 
-# Automatically run your agy custom action scripts natively
-if [ -d ".agents" ]; then
-  .agents/skills/hex-validate/scripts/validate.sh || exit 1
-  .agents/skills/sec-audit/scripts/audit.sh || exit 1
-elif [ -d "$HOME/.agents" ]; then
-  if [ -d "internal/domain" ] || [ -d "src" ] || [ -d "internal" ]; then
-    "$HOME/.agents/skills/hex-validate/scripts/validate.sh" || exit 1
-    "$HOME/.agents/skills/sec-audit/scripts/audit.sh" || exit 1
+echo "🛡️  [AGY] Running Pre-Commit Governance Shield..."
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+FAILURES=0
+
+# Resolve script search paths: local .agents/skills/, then global ~/.gemini/scripts/
+resolve_script() {
+  local name="$1"
+  if [ -f "$ROOT/.agents/skills/$name/scripts/$(basename $name).sh" ]; then
+    echo "$ROOT/.agents/skills/$name/scripts/$(basename $name).sh"
+  elif [ -f "$ROOT/scripts/$name.sh" ]; then
+    echo "$ROOT/scripts/$name.sh"
+  elif [ -f "$HOME/.gemini/scripts/$name.sh" ]; then
+    echo "$HOME/.gemini/scripts/$name.sh"
+  else
+    echo ""
   fi
+}
+
+run_gate() {
+  local gate_name="$1"
+  local script
+  script=$(resolve_script "$gate_name")
+
+  if [ -z "$script" ]; then
+    echo "⚠️  [$gate_name] Script not found — skipping gate."
+    return 0
+  fi
+
+  bash "$script"
+  if [ $? -ne 0 ]; then
+    echo "❌ [$gate_name] Gate FAILED."
+    FAILURES=$((FAILURES + 1))
+  else
+    echo "✅ [$gate_name] Gate PASSED."
+  fi
+}
+
+# Run all gates
+run_gate "hex-validate"
+run_gate "sec-audit"
+run_gate "ui-lint"
+
+# Final verdict
+if [ "$FAILURES" -gt 0 ]; then
+  echo ""
+  echo "🚫 [AGY] Commit BLOCKED — $FAILURES gate(s) failed."
+  echo "   Fix the issues above and re-run: git commit"
+  exit 1
 fi
 
-echo "?? All guardrails cleared. Proceeding with Git commit."
+echo ""
+echo "✅ [AGY] All governance gates passed. Proceeding with commit."
 exit 0
