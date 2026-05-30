@@ -37,12 +37,20 @@ For complex objectives, the Coordinator spawns a specialized swarm partitioned a
 To mirror this configuration instantly on a second machine, run the following commands based on your operating system:
 
 ### 1. Common Initialization (All Operating Systems)
-```bash
-# Create the destination folder path
-mkdir -p ~/.gemini/antigravity-cli/
 
-# Clone the configuration files directly into the global space
+First, initialize the global configuration folder and your central development workspace, then clone the required repositories:
+
+```bash
+# Create the global configuration space and clone the dotfiles
+mkdir -p ~/.gemini/antigravity-cli/
 git clone https://github.com/andersonbdalton/agy-dotfiles.git ~/.gemini/antigravity-cli/
+
+# Create your central development workspace folder
+mkdir -p ~/dev/
+
+# Navigate to your development workspace to clone your project code
+cd ~/dev/
+# git clone <your-active-project-repo-url>
 ```
 
 ### 2. OS-Specific Ownership & Permission Settings
