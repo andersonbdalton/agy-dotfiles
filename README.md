@@ -47,6 +47,11 @@ git clone https://github.com/andersonbdalton/agy-dotfiles.git ~/.gemini/antigrav
 ln -sf ~/.gemini/antigravity-cli/scripts/pre-commit ~/.gemini/antigravity-cli/.git/hooks/pre-commit
 chmod +x ~/.gemini/antigravity-cli/.git/hooks/pre-commit
 
-# 4. Verify directory contents
+# 4. Ensure correct ownership and read/write permissions for the active user
+chown -R $(whoami) ~/.gemini/ ~/dev/ 2>/dev/null || true
+chmod -R u+rwx ~/.gemini/ ~/dev/ 2>/dev/null || true
+
+# 5. Verify directory contents
 ls -la ~/.gemini/antigravity-cli/
 ```
+
