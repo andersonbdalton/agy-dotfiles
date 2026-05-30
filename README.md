@@ -22,15 +22,27 @@ Our background engine is equipped with 6 custom commands deployed globally to en
 5. **`/clean-room` (The Workspace Janitor):** Forcefully purges build caches, lockfile collisions, and loose tracking artifacts to maintain performance.
 6. **`/test-matrix` (Automated Integration Test Runner):** Automatically discovers and executes unit, integration, and E2E test suites inside the local workspace.
 
-### 5-Agent Swarm Topology
+### V3 Hierarchical Swarm Topology & Router-Worker Design
 
-For complex objectives, the Coordinator spawns a specialized swarm partitioned as follows:
+For complex, enterprise-scale objectives, the Coordinator spawns a hierarchical network of 5 Core Agent Directors. Each Director autonomously manages nested Specialist Worker sub-agents on-demand:
 
-*   **Subagent 1 (The Domain Engineer):** Focuses solely on business logic, rule definitions, and ports interfaces, with zero awareness of infrastructure or frameworks.
-*   **Subagent 2 (The Adapter Integrator):** Confined to implementation files (SQL queries, APIs, message brokers) that satisfy the ports defined by Subagent 1.
-*   **Subagent 3 (The UI Architect):** Handles presentation layouts and interactive components using fluid utility layouts tied strictly to central design tokens.
-*   **Subagent 4 (The Security & Compliance Officer):** Inspects changes, runs `/sec-audit`, verifies authentication middleware, and prevents vulnerable packages from being introduced.
-*   **Subagent 5 (The Automated QA & Testing Suite):** Launches dev servers, mounts mock datasets, and drives `/browser` tool execution to visually verify layout responsiveness.
+*   **1. The Domain Engineer (Director):** Confined strictly to core business models and interfaces (`/internal/domain/`).
+    *   *Worker: The Migration & Refactoring Specialist:* Triggered for modernizing legacy code (e.g., JS to TS, REST to GraphQL).
+*   **2. The Adapter Integrator (Director):** Confined to infrastructure implementations and database adapters.
+    *   *Worker: The Database Schema Engineer:* Generates SQL migration scripts, builds indexes, and drafts rollbacks.
+    *   *Worker: The Docker/K8s Configurator:* Builds container manifests and debugs local container loops.
+    *   *Worker: The CI/CD Pipeline Architect:* Configures workflows (e.g., GitHub Actions).
+*   **3. The UI Architect (Director):** Handles layouts, screen states, and framework-agnostic client data layers.
+    *   *Worker: The Synthetic Data Generator:* Populates schema-compliant mock data (JSON, CSV, SQL).
+    *   *Worker: The Documentation Writer:* Generates OpenAPI/Swagger specs and keeps docs updated.
+*   **4. The Security & Compliance Officer (Director):** Manages repository security gates and secret tracking.
+    *   *Worker: The Code Reviewer / Linter:* Audits code changes and identifies syntax issues/code smells.
+    *   *Worker: The Dependency Validator:* Checks manifests for CVE vulnerabilities and updates lockfiles.
+*   **5. The Automated QA & Testing Suite (Director):** Runs verification checks and browser automation runs.
+    *   *Worker: The Test Generator:* Writes unit/integration tests to eliminate coverage gaps.
+    *   *Worker: The UI Regression Auditor:* Performs visual regression passes using headless browser captures.
+    *   *Worker: The Accessibility Checker:* Scans HTML structures for screen-reader and keyboard compliance.
+    *   *Worker: The Log Interpreter / Debugger:* Parses stack traces from build crashes to provide automated patches.
 
 ## Migration Guide & Setup Instructions
 
@@ -43,7 +55,7 @@ First, initialize the global configuration folder and your central development w
 ```bash
 # Create the global configuration space and clone the dotfiles
 mkdir -p ~/.gemini/antigravity-cli/
-git clone https://github.com/andersonbdalton/agy-dotfiles.git ~/.gemini/antigravity-cli/
+git clone https://github.com/daltna/agy-dotfiles.git ~/.gemini/antigravity-cli/
 
 # Create your central development workspace folder
 mkdir -p ~/dev/
