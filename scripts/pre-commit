@@ -1,0 +1,16 @@
+#!/bin/bash
+echo "??? Running Pre-Commit Governance Shield..."
+
+# Automatically run your agy custom action scripts natively
+if [ -d ".agents" ]; then
+  .agents/skills/hex-validate/scripts/validate.sh || exit 1
+  .agents/skills/sec-audit/scripts/audit.sh || exit 1
+elif [ -d "$HOME/.agents" ]; then
+  if [ -d "internal/domain" ] || [ -d "src" ] || [ -d "internal" ]; then
+    "$HOME/.agents/skills/hex-validate/scripts/validate.sh" || exit 1
+    "$HOME/.agents/skills/sec-audit/scripts/audit.sh" || exit 1
+  fi
+fi
+
+echo "?? All guardrails cleared. Proceeding with Git commit."
+exit 0
