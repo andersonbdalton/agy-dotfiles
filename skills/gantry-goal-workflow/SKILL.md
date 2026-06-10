@@ -406,27 +406,31 @@ creates a Todoist task assigned to you so it appears in your Todoist inbox immed
 - Missing npm package → agent installs it
 - File doesn't exist → agent creates it
 
-### Setup (One Time)
+### Setup (One Time — Human Action Required)
 
 **Step 1 — Get your Todoist API token:**
 1. Open Todoist → Settings → Integrations → Developer
-2. Copy your API token
+2. Copy your personal API token
 
-**Step 2 — Set the environment variable:**
+**Step 2 — Store in GCP Secret Manager:**
 ```powershell
-# Windows — set for current session
-$env:TODOIST_API_TOKEN = "your_token_here"
+# Create the secret (paste token when prompted, then Ctrl+Z + Enter on Windows)
+gcloud secrets create gantry-todoist-api-token `
+  --data-file=- --project=ianua-gantry-prod
 
-# Persist across all PowerShell sessions — add to your $PROFILE
-Add-Content $PROFILE "`n`$env:TODOIST_API_TOKEN = 'your_token_here'"
-
-# Optional — scope tasks to a specific Todoist project
-$env:TODOIST_PROJECT_ID = "your_project_id_here"
+# Optional — scope agent tasks to a specific Todoist project
+# Get project ID from URL: todoist.com/app/project/2350XXXXXX
+gcloud secrets create gantry-todoist-project-id `
+  --data-file=- --project=ianua-gantry-prod
 ```
 
-**Step 3 — Get your Project ID (optional but recommended):**
-- Open the Todoist project you want agent tasks in
-- The project ID is the number in the URL: `todoist.com/app/project/2350XXXXXX`
+That's it. No tokens on disk. No env vars. The agent pulls the token from Secret Manager
+at runtime every time it needs to create a blocker task.
+
+**Verify it's stored:**
+```powershell
+gcloud secrets versions access latest --secret=gantry-todoist-api-token --project=ianua-gantry-prod
+```
 
 ### How the Agent Creates Tasks
 

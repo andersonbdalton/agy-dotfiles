@@ -1,52 +1,73 @@
 # =============================================================================
-# blocked.ps1 — Called by the agent whenever a /goal hits a BLOCKED state.
+# blocked.ps1 — Called by the agent when /goal hits a true blocker.
+#
+# Pulls TODOIST_API_TOKEN from GCP Secret Manager at runtime.
+# No tokens stored locally — ever.
 #
 # USAGE:
 #   .\scripts\blocked.ps1 `
 #     -Goal "GOAL-007" `
 #     -Title "Load balancer SSL cert needs manual domain verification" `
-#     -Context "gcloud ssl-certificates create requires domain verified. DNS not yet pointing to LB IP." `
+#     -Context "gcloud ssl-certificates create completed but cert is PROVISIONING. TXT record needed at Cloudflare for gantryframe.com." `
 #     -Priority 1
 #
-# SETUP:
-#   $env:TODOIST_API_TOKEN = "your_token_here"
-#   Get token at: https://todoist.com/app/settings/integrations/developer
+# REQUIRES (one-time, done by human):
+#   gcloud secrets create gantry-todoist-api-token `
+#     --data-file=- --project=ianua-gantry-prod
+#   # paste token, then Ctrl+Z Enter on Windows
 #
-# PRIORITY SCALE (Todoist):
-#   1 = p1 (red, urgent)   — agent is completely stopped, cannot proceed
-#   2 = p2 (orange)        — blocked but a workaround exists
-#   3 = p3 (blue)          — needs user input but not urgent
-#   4 = p4 (normal)        — FYI / decision needed eventually
+# PRIORITY SCALE:
+#   1 = p1 red    — agent completely stopped
+#   2 = p2 orange — partially blocked
+#   3 = p3 blue   — needs decision, not urgent
+#   4 = p4 normal — FYI
 # =============================================================================
 
 param(
     [Parameter(Mandatory=$true)]  [string]$Goal,
     [Parameter(Mandatory=$true)]  [string]$Title,
-    [Parameter(Mandatory=$false)] [string]$Context = "",
+    [Parameter(Mandatory=$false)] [string]$Context  = "",
     [Parameter(Mandatory=$false)] [int]   $Priority = 1,
-    [Parameter(Mandatory=$false)] [string]$Due = "today",
-    [Parameter(Mandatory=$false)] [string]$ProjectId = $env:TODOIST_PROJECT_ID
+    [Parameter(Mandatory=$false)] [string]$Due      = "today",
+    [Parameter(Mandatory=$false)] [string]$Project  = "ianua-gantry-prod"
 )
 
-# ── Validate token ────────────────────────────────────────────────────────────
-$token = $env:TODOIST_API_TOKEN
-if (-not $token) {
+# ── Pull token from Secret Manager ───────────────────────────────────────────
+Write-Host "🔐 Fetching Todoist token from Secret Manager..." -ForegroundColor Cyan
+
+try {
+    $token = gcloud secrets versions access latest `
+        --secret=gantry-todoist-api-token `
+        --project=$Project 2>$null
+
+    if (-not $token) { throw "Empty result" }
+}
+catch {
     Write-Host ""
-    Write-Host "❌ TODOIST_API_TOKEN not set." -ForegroundColor Red
+    Write-Host "❌ Could not read 'gantry-todoist-api-token' from Secret Manager." -ForegroundColor Red
     Write-Host ""
-    Write-Host "   1. Get your token at: https://todoist.com/app/settings/integrations/developer"
-    Write-Host "   2. Set it in PowerShell:"
-    Write-Host "      `$env:TODOIST_API_TOKEN = 'your_token_here'"
-    Write-Host "   3. Or add it to your .env.local file to persist across sessions"
+    Write-Host "   Create it once with:"
+    Write-Host "   gcloud secrets create gantry-todoist-api-token --data-file=- --project=$Project"
+    Write-Host "   (paste your Todoist API token, then Ctrl+Z + Enter)"
+    Write-Host ""
+    Write-Host "   Get your token at: https://todoist.com/app/settings/integrations/developer"
     Write-Host ""
     exit 1
 }
 
-# ── Build content ─────────────────────────────────────────────────────────────
-$timestamp  = (Get-Date -Format "yyyy-MM-dd HH:mm") + " UTC"
-$taskContent = "🔴 [$Goal] BLOCKED: $Title"
+# ── Pull project ID from Secret Manager (optional) ───────────────────────────
+$projectId = $null
+try {
+    $projectId = gcloud secrets versions access latest `
+        --secret=gantry-todoist-project-id `
+        --project=$Project 2>$null
+} catch { $projectId = $null }
 
+# ── Build task ────────────────────────────────────────────────────────────────
+$timestamp   = (Get-Date -Format "yyyy-MM-dd HH:mm") + " UTC"
+$taskContent = "🔴 [$Goal] BLOCKED: $Title"
 $description = ""
+
 if ($Context) {
     $description = @"
 **Context from agent:**
@@ -54,24 +75,20 @@ if ($Context) {
 $Context
 
 ---
-*Auto-created by Antigravity agent — $timestamp*
+*Auto-created by Antigravity — $timestamp*
 *Goal: $Goal*
 *Resume with: ``/goal continue $Goal``*
 "@
 }
 
-# ── Build payload ─────────────────────────────────────────────────────────────
 $payload = @{
-    content     = $taskContent
+    content    = $taskContent
     description = $description
-    priority    = $Priority
-    due_string  = $Due
-    labels      = @("agent-blocker", "gantry")
+    priority   = $Priority
+    due_string = $Due
+    labels     = @("agent-blocker", "gantry")
 }
-
-if ($ProjectId) {
-    $payload["project_id"] = $ProjectId
-}
+if ($projectId) { $payload["project_id"] = $projectId }
 
 $body = $payload | ConvertTo-Json -Depth 5
 
@@ -84,25 +101,21 @@ try {
         -Body $body
 
     Write-Host ""
-    Write-Host "✅ Todoist task created" -ForegroundColor Green
-    Write-Host "   Goal:     $Goal"
-    Write-Host "   Blocker:  $Title"
-    Write-Host "   Priority: p$Priority"
-    Write-Host "   Task ID:  $($response.id)"
-    if ($response.url) { Write-Host "   URL:      $($response.url)" }
+    Write-Host "✅ Todoist task created (p$Priority)" -ForegroundColor Green
+    Write-Host "   Goal:    $Goal"
+    Write-Host "   Blocker: $Title"
+    Write-Host "   Task ID: $($response.id)"
     Write-Host ""
-    Write-Host "⏸️  Agent is BLOCKED. Once resolved, run:" -ForegroundColor Yellow
-    Write-Host "   /goal continue $Goal"
+    Write-Host "⏸️  Agent BLOCKED. Resolve → /goal continue $Goal" -ForegroundColor Yellow
     Write-Host ""
 }
 catch {
     Write-Host ""
-    Write-Host "❌ Failed to create Todoist task: $_" -ForegroundColor Red
-    Write-Host "   Check your TODOIST_API_TOKEN and network connection."
+    Write-Host "❌ Todoist API call failed: $_" -ForegroundColor Red
+    Write-Host "   Verify the token in Secret Manager is valid."
     Write-Host ""
-    Write-Host "   Fallback — manual task description:"
+    Write-Host "   Manual fallback:"
     Write-Host "   [$Goal] BLOCKED: $Title"
-    if ($Context) { Write-Host "   Context: $Context" }
-    Write-Host ""
+    if ($Context) { Write-Host "   $Context" }
     exit 1
 }

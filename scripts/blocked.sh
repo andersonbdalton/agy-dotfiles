@@ -1,29 +1,32 @@
 #!/usr/bin/env bash
 # =============================================================================
-# blocked.sh — Called by the agent whenever a /goal hits a BLOCKED state.
+# blocked.sh — Called by the agent when /goal hits a true blocker.
+#
+# Pulls TODOIST_API_TOKEN from GCP Secret Manager at runtime.
+# No tokens stored locally — ever.
 #
 # USAGE:
 #   ./scripts/blocked.sh \
 #     --goal "GOAL-007" \
-#     --title "Load balancer wildcard SSL cert needs manual provisioning" \
-#     --context "gcloud compute ssl-certificates create requires domain verification. Domain is registered but DNS not yet pointing to LB IP." \
+#     --title "Load balancer SSL cert needs manual domain verification" \
+#     --context "gcloud ssl-certificates create completed but cert is PROVISIONING. TXT record needed at Cloudflare for gantryframe.com." \
 #     --priority 1
 #
-# REQUIREMENTS:
-#   - TODOIST_API_TOKEN env var (get from todoist.com/app/settings/integrations)
-#   - TODOIST_PROJECT_ID env var (optional — defaults to inbox)
-#   - curl
+# REQUIRES (one-time, done by human):
+#   gcloud secrets create gantry-todoist-api-token \
+#     --data-file=- --project=ianua-gantry-prod
+#   # Paste token, Ctrl+D
 #
-# PRIORITY SCALE (Todoist):
-#   1 = p1 (red, urgent)   — agent is completely stopped
-#   2 = p2 (orange)        — blocked but can work around
-#   3 = p3 (blue)          — needs input but not urgent
-#   4 = p4 (normal)        — FYI
+# PRIORITY SCALE:
+#   1 = p1 red    — agent completely stopped
+#   2 = p2 orange — partially blocked
+#   3 = p3 blue   — needs decision, not urgent
+#   4 = p4 normal — FYI
 # =============================================================================
 
 set -euo pipefail
 
-# ── Parse arguments ───────────────────────────────────────────────────────────
+GCP_PROJECT="${GCP_PROJECT:-ianua-gantry-prod}"
 GOAL=""
 TITLE=""
 CONTEXT=""
@@ -41,59 +44,55 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# ── Validate ──────────────────────────────────────────────────────────────────
-if [[ -z "${TODOIST_API_TOKEN:-}" ]]; then
-  echo "❌ TODOIST_API_TOKEN not set. Add it to your environment."
-  echo "   Get your token at: https://todoist.com/app/settings/integrations/developer"
-  echo ""
-  echo "   PowerShell: \$env:TODOIST_API_TOKEN = 'your_token_here'"
-  echo "   Add to .env.local to persist."
-  exit 1
-fi
-
 if [[ -z "$TITLE" ]]; then
   echo "❌ --title is required"
   exit 1
 fi
 
-# ── Build task content ────────────────────────────────────────────────────────
-TASK_CONTENT="🔴 [${GOAL}] BLOCKED: ${TITLE}"
+# ── Pull token from Secret Manager ───────────────────────────────────────────
+echo "🔐 Fetching Todoist token from Secret Manager..."
+TODOIST_API_TOKEN=$(gcloud secrets versions access latest \
+  --secret=gantry-todoist-api-token \
+  --project="${GCP_PROJECT}" 2>/dev/null) || {
+  echo "❌ Could not read secret 'gantry-todoist-api-token' from project '${GCP_PROJECT}'"
+  echo "   Create it once with:"
+  echo "   gcloud secrets create gantry-todoist-api-token --data-file=- --project=${GCP_PROJECT}"
+  exit 1
+}
 
-DESCRIPTION=""
-if [[ -n "$CONTEXT" ]]; then
-  DESCRIPTION="**Context from agent:**
+# ── Pull project ID from Secret Manager (optional) ───────────────────────────
+TODOIST_PROJECT_ID=$(gcloud secrets versions access latest \
+  --secret=gantry-todoist-project-id \
+  --project="${GCP_PROJECT}" 2>/dev/null) || TODOIST_PROJECT_ID=""
+
+# ── Build task ────────────────────────────────────────────────────────────────
+TASK_CONTENT="🔴 [${GOAL}] BLOCKED: ${TITLE}"
+TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
+
+DESCRIPTION="**Context from agent:**
 
 ${CONTEXT}
 
 ---
-*Auto-created by Antigravity agent — $(date -u +"%Y-%m-%d %H:%M UTC")*
+*Auto-created by Antigravity — ${TIMESTAMP}*
 *Goal: ${GOAL}*
 *Resume with: \`/goal continue ${GOAL}\`*"
-fi
 
-# ── Build JSON payload ────────────────────────────────────────────────────────
-JSON_PAYLOAD=$(cat <<EOF
-{
-  "content": $(echo "$TASK_CONTENT" | python3 -c "import json,sys; print(json.dumps(sys.stdin.read().strip()))"),
-  "description": $(echo "$DESCRIPTION" | python3 -c "import json,sys; print(json.dumps(sys.stdin.read().strip()))"),
-  "priority": ${PRIORITY},
-  "due_string": "${DUE}",
-  "labels": ["agent-blocker", "gantry"]
+JSON_PAYLOAD=$(python3 -c "
+import json
+payload = {
+    'content':     '${TASK_CONTENT//\'/\\\'}',
+    'description': $(echo "$DESCRIPTION" | python3 -c "import json,sys; print(json.dumps(sys.stdin.read().strip()))"),
+    'priority':    ${PRIORITY},
+    'due_string':  '${DUE}',
+    'labels':      ['agent-blocker', 'gantry']
 }
-EOF
-)
-
-# Add project_id if set
-if [[ -n "${TODOIST_PROJECT_ID:-}" ]]; then
-  JSON_PAYLOAD=$(echo "$JSON_PAYLOAD" | python3 -c "
-import json,sys
-d = json.load(sys.stdin)
-d['project_id'] = '${TODOIST_PROJECT_ID}'
-print(json.dumps(d))
+if '${TODOIST_PROJECT_ID}':
+    payload['project_id'] = '${TODOIST_PROJECT_ID}'
+print(json.dumps(payload))
 ")
-fi
 
-# ── Post to Todoist API ───────────────────────────────────────────────────────
+# ── Post to Todoist ───────────────────────────────────────────────────────────
 RESPONSE=$(curl -sf \
   -X POST \
   -H "Authorization: Bearer ${TODOIST_API_TOKEN}" \
@@ -102,15 +101,11 @@ RESPONSE=$(curl -sf \
   "https://api.todoist.com/rest/v2/tasks")
 
 TASK_ID=$(echo "$RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])" 2>/dev/null || echo "unknown")
-TASK_URL=$(echo "$RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin).get('url', ''))" 2>/dev/null || echo "")
 
 echo ""
-echo "✅ Todoist task created"
-echo "   Goal:     ${GOAL}"
-echo "   Blocker:  ${TITLE}"
-echo "   Priority: p${PRIORITY}"
-echo "   Task ID:  ${TASK_ID}"
-[[ -n "$TASK_URL" ]] && echo "   URL:      ${TASK_URL}"
+echo "✅ Todoist task created (p${PRIORITY})"
+echo "   Goal:    ${GOAL}"
+echo "   Blocker: ${TITLE}"
+echo "   Task ID: ${TASK_ID}"
 echo ""
-echo "⏸️  Agent is now BLOCKED. Resolve the above, then run:"
-echo "   /goal continue ${GOAL}"
+echo "⏸️  Agent BLOCKED. Resolve → /goal continue ${GOAL}"
