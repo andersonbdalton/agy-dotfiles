@@ -1,4 +1,4 @@
-﻿# agy-dotfiles
+# agy-dotfiles
 
 Global configuration and skill definitions for the **Antigravity AI** development environment.
 
@@ -23,11 +23,18 @@ agy-dotfiles/
 │   └── verify_ts.sh       # tsc --noEmit after .ts/.tsx file writes
 └── skills/                # Agent skill definitions
     ├── unrestricted-architect/   # V4 lean 3-director swarm
-    ├── goal-executor/            # /goal prompt template
+    ├── find-skills/              # Skills discovery at skills.sh
+    ├── google-agents-cli-adk-code/   # ADK Python API patterns
+    ├── google-agents-cli-deploy/     # ADK deployment (Cloud Run, GKE)
+    ├── google-agents-cli-eval/       # ADK evaluation and evalsets
+    ├── google-agents-cli-observability/  # Cloud Trace, BigQuery, AgentOps
+    ├── google-agents-cli-publish/    # Agent publishing to Gemini Enterprise
+    ├── google-agents-cli-scaffold/   # ADK project scaffolding
+    ├── google-agents-cli-workflow/   # Full ADK dev lifecycle
+    ├── gantry-goal-workflow/         # /goal structured goal-driven development
     ├── hex-validate/             # /hex-validate slash command
     ├── sec-audit/                # /sec-audit slash command
-    ├── ui-lint/                  # /ui-lint slash command
-    └── test-matrix/              # Test generation and execution
+    └── ui-lint/                  # /ui-lint slash command
 ```
 
 ---
@@ -54,6 +61,43 @@ Adapter       Docs      Security
 | D3 QA & Security | Tests, lint, CVE, debug | E2E across multiple repos |
 
 Default: Directors work inline. Sub-agents only for isolated, deep-context tasks.
+
+---
+
+## Skills Reference
+
+Skills are installed in `~/.agents/skills/` and auto-detected on startup.
+
+| Skill | Trigger | Description |
+|---|---|---|
+| `unrestricted-architect` | Always active | Enforces modular architecture, auto-corrects build failures up to 10 continuous iterations |
+| `find-skills` | "find a skill for X" | Searches the open agent skills ecosystem at skills.sh |
+| `google-agents-cli-adk-code` | "write agent code", "ADK tool" | Google ADK Python API patterns — tools, callbacks, orchestration, state |
+| `google-agents-cli-deploy` | "deploy an agent", "Cloud Run" | ADK deployment to Agent Runtime, Cloud Run, and GKE |
+| `google-agents-cli-eval` | "evaluate my agent", "evalset" | ADK evaluation — metrics, evalsets, LLM-as-judge, eval-fix loop |
+| `google-agents-cli-observability` | "set up tracing", "monitor agent" | Cloud Trace, BigQuery analytics, AgentOps, Phoenix, MLflow |
+| `google-agents-cli-publish` | "publish agent", "Gemini Enterprise" | Agent publishing and registration with Gemini Enterprise |
+| `google-agents-cli-scaffold` | "create agent project" | ADK scaffolding — scaffold create, enhance, upgrade |
+| `google-agents-cli-workflow` | "develop an agent", "build with ADK" | Full ADK lifecycle — scaffold → build → eval → deploy → observe |
+| `hex-validate` | /hex-validate | Validates hexagonal architecture boundaries in Go/Rust/TS projects |
+| `sec-audit` | /sec-audit | Security audit — secrets scanning, CVE check |
+| `ui-lint` | /ui-lint | TypeScript + ESLint + Prettier validation |
+| `gantry-goal-workflow` | /goal, /grill-me, "write spec" | Structured goal-driven development — roadmaps, specs, autonomous execution |
+
+---
+
+## Slash Commands
+
+| Command | Description |
+|---|---|
+| /goal start GOAL-XXX | Execute a goal spec autonomously to completion |
+| /goal continue GOAL-XXX | Resume an interrupted goal |
+| /goal confirm GOAL-XXX | Mark goal complete, update roadmap |
+| /grill-me on GOAL-XXX | Pre-spec interview — surface requirements, resolve ambiguity |
+| /schedule | Set a recurring cron or one-shot timer for a task |
+| /hex-validate | Check hexagonal architecture boundaries |
+| /sec-audit | Run security audit |
+| /ui-lint | Run TypeScript + ESLint + Prettier |
 
 ---
 
@@ -123,3 +167,21 @@ chmod +x ~/.gemini/scripts/*.sh
 - Sub-agents auto-killed on task completion
 - Parallel writes use branch isolation
 - Tasks completable in under 500 lines of output: always inline, never sub-agent
+
+---
+
+## Installation on a New Machine
+
+```bash
+# Clone the dotfiles
+git clone https://github.com/daltna/agy-dotfiles.git ~/dev/agy-dotfiles
+
+# Copy skills to the agent skills directory
+# Windows (PowerShell):
+Copy-Item -Recurse agy-dotfiles/skills/* $env:USERPROFILE\.agents\skills\
+
+# macOS/Linux:
+cp -r agy-dotfiles/skills/* ~/.agents/skills/
+```
+
+The agent will automatically detect skills in `~/.agents/skills/` on next startup.
