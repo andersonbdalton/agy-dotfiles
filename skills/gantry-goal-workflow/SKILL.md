@@ -385,3 +385,153 @@ war-room/[Project]/
 ```
 
 The `Sessions/` directory is optional but valuable — a 2-sentence summary per session makes it easy to re-orient after any gap.
+
+---
+
+## Todoist Blocker Integration
+
+When a `/goal` run hits a **true blocker** — something the agent cannot resolve autonomously — it
+creates a Todoist task assigned to you so it appears in your Todoist inbox immediately.
+
+**"True blocker" means:**
+- Manual credential action required (e.g. OAuth, 2FA, domain verification)
+- GCP IAM permission that needs a human to grant
+- External dependency not yet available (e.g. DNS not propagated, API not yet provisioned)
+- A decision with business implications that the agent cannot make
+- A secret/API key that doesn't exist yet and needs to be created
+
+**NOT a blocker (agent fixes these itself):**
+- Build errors → agent self-corrects up to 10 iterations
+- Type errors → agent reads the error and fixes it
+- Missing npm package → agent installs it
+- File doesn't exist → agent creates it
+
+### Setup (One Time)
+
+**Step 1 — Get your Todoist API token:**
+1. Open Todoist → Settings → Integrations → Developer
+2. Copy your API token
+
+**Step 2 — Set the environment variable:**
+```powershell
+# Windows — set for current session
+$env:TODOIST_API_TOKEN = "your_token_here"
+
+# Persist across all PowerShell sessions — add to your $PROFILE
+Add-Content $PROFILE "`n`$env:TODOIST_API_TOKEN = 'your_token_here'"
+
+# Optional — scope tasks to a specific Todoist project
+$env:TODOIST_PROJECT_ID = "your_project_id_here"
+```
+
+**Step 3 — Get your Project ID (optional but recommended):**
+- Open the Todoist project you want agent tasks in
+- The project ID is the number in the URL: `todoist.com/app/project/2350XXXXXX`
+
+### How the Agent Creates Tasks
+
+When blocked, the agent runs:
+```powershell
+# Windows
+.\scripts\blocked.ps1 `
+  -Goal "GOAL-007" `
+  -Title "SSL certificate requires manual domain verification" `
+  -Context "gcloud compute ssl-certificates create completed but cert is in PROVISIONING state. Domain TXT record must be added at registrar. Registrar: Cloudflare. Zone: gantryframe.com" `
+  -Priority 1
+```
+
+This creates a Todoist task that looks like:
+
+```
+🔴 [GOAL-007] BLOCKED: SSL certificate requires manual domain verification
+
+Context from agent:
+gcloud compute ssl-certificates create completed but cert is in PROVISIONING
+state. Domain TXT record must be added at registrar.
+Registrar: Cloudflare. Zone: gantryframe.com
+
+---
+Auto-created by Antigravity agent — 2026-06-10 14:30 UTC
+Goal: GOAL-007
+Resume with: `/goal continue GOAL-007`
+```
+
+### Priority Scale
+
+| Priority | Todoist Color | When to Use |
+|---|---|---|
+| `1` | 🔴 Red (p1, urgent) | Agent is completely stopped — cannot proceed at all |
+| `2` | 🟠 Orange (p2) | Blocked on one path but can partially continue |
+| `3` | 🔵 Blue (p3) | Needs a decision but not time-critical |
+| `4` | ⚪ Normal (p4) | FYI / something to review when you have time |
+
+### Labels Applied Automatically
+
+Every agent-created task gets these labels:
+- `agent-blocker` — filter to see all open agent blockers
+- `gantry` — or whatever project prefix is relevant
+
+**Todoist filter to see all open blockers:**
+```
+label:agent-blocker & !completed
+```
+
+### The Resolution Loop
+
+```
+Agent hits blocker
+    │
+    ▼
+blocked.ps1 runs → Todoist task created → appears on your phone/desktop
+    │
+    ▼
+You see it in Todoist
+    │
+    ▼
+You resolve it (grant IAM, add DNS record, create secret, etc.)
+    │
+    ▼
+Check the task in Todoist
+    │
+    ▼
+Return to Antigravity and run:
+    /goal continue GOAL-XXX
+    │
+    ▼
+Agent resumes where it stopped
+```
+
+### Todoist Task Checklist (For You to Fill In)
+
+When you receive an agent-blocker task, the resolution steps are always one of:
+
+| Blocker Type | What to Do |
+|---|---|
+| GCP IAM permission | `gcloud projects add-iam-policy-binding ... --role=...` |
+| Secret doesn't exist | `gcloud secrets create ... --data-file=-` |
+| DNS record needed | Add TXT/CNAME at your registrar (Cloudflare, etc.) |
+| OAuth/2FA required | Log in manually and re-run `gcloud auth login` |
+| API not enabled | `gcloud services enable [api].googleapis.com` |
+| Decision needed | Make the call, update the spec, `/goal continue` |
+| External dep not ready | Wait, then `/goal continue` when it's live |
+
+---
+
+## Files to Keep in War Room
+
+For any project using this workflow, maintain these files:
+
+```
+war-room/[Project]/
+├── Roadmap.md                    ← Goal sequence + status
+├── Architecture.md               ← System design decisions (updated after each goal)
+├── Goals/
+│   ├── GOAL-001-Spec.md
+│   ├── GOAL-002-Spec.md
+│   └── ...
+└── Sessions/
+    ├── YYYY-MM-DD.md             ← What happened in each session
+    └── ...
+```
+
+The `Sessions/` directory is optional but valuable — a 2-sentence summary per session makes it easy to re-orient after any gap.
